@@ -10,7 +10,7 @@ namespace AggregateGDPPopulation
     {
         public static void AggregateCalculation()
         {
-            var CsvData = File.ReadLines(@"D:\workspace\aggregate-gdp-population-csharp-problem-Varunn96\AggregateGDPPopulation\data\datafile.csv");
+            var CsvData = File.ReadLines("../../../../AggregateGDPPopulation/data/datafile.csv");
             List<string> CsvDataList = CsvData.ToList();
             //Console.Write(CsvDataList[1]); ===> First Country Details
 
@@ -32,7 +32,7 @@ namespace AggregateGDPPopulation
             }
             //Console.WriteLine(CsvDataListSplitByComma[0][CountryIndex]); ===> Argentina
 
-            Dictionary<string, string> MapDataDictionary = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(@"D:\workspace\aggregate-gdp-population-csharp-problem-Varunn96\AggregateGDPPopulation\data\countrytocontinentmap.json"));
+            Dictionary<string, string> MapDataDictionary = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText("../../../../AggregateGDPPopulation/data/countrytocontinentmap.json"));
 
             Dictionary<string, GDPPop> AggregateOutput = new Dictionary<string, GDPPop>();
             CsvDataListSplitByComma.ForEach((row) =>
