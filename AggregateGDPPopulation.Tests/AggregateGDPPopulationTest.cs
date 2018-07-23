@@ -2,20 +2,26 @@ using System;
 using Xunit;
 using AggregateGDPPopulation;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace AggregateGDPPopulation.Tests
 {
     public class UnitTest1
     {
         [Fact]
-        public void Test1()
+        public async Task Test1Async()
         {
-            AggregateClass.AggregateCalculation();
-            StreamReader generatedOutput = new StreamReader("../../../../AggregateGDPPopulation/output/output.json");
-            StreamReader expectedOutput = new StreamReader("../../../expected-output.json");
-            string actual = generatedOutput.ReadToEnd();
-            string expected = expectedOutput.ReadToEnd();
+            await AggregateClass.AggregateCalculationAsync();
+            Task<string> actualstring = ReadFileAsync("../../../../AggregateGDPPopulation/output/output.json");
+            Task<string> expectedstring = ReadFileAsync("../../../expected-output.json");
+            string actual = await actualstring;
+            string expected = await expectedstring;
             Assert.True(actual == expected);
+        }
+        public static async Task<string> ReadFileAsync(string filepath)
+        {
+            StreamReader generatedOutput = new StreamReader(filepath);
+            return await generatedOutput.ReadToEndAsync();
         }
     }
 }
