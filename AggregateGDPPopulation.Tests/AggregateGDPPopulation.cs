@@ -3,56 +3,106 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
-using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace AggregateGDPPopulation
 {
-    public class AggregateClass
+    public class AggregateGDPPopulation
     {
-        public static async Task AggregateCalculationAsync()
+       
+        public async Task performAggregateOperation()
         {
-            // Reading Files asynchronously. Second file is read independently
-            Task<List<string>> CsvData = ReadCSVFileAsync("../../../../AggregateGDPPopulation/data/datafile.csv");
-            Task<string> MapDataString = ReadMapFileAsync("../../../../AggregateGDPPopulation/data/countrytocontinentmap.json");
+            Task<List<string>> CsvData = IOOperations.ReadFileByLineAsync("../../../../AggregateGDPPopulation/data/datafile.csv");
+            Task<string> MapDataString = IOOperations.ReadFileToEndAsync("../../../../AggregateGDPPopulation/data/countrytocontinentmap.json");
 
-            // Awaiting contents of first file to be read to proceed. List of strings returned
             List<string> CsvDataList = await CsvData;
-
-            // Obtaining only headers from CsvDataList, and split by comma and add into string array
             string[] CsvDataHeaders = CsvDataList[0].Replace("\"", string.Empty).Split(',');
-
-            // Obtaining indices of required fields
             int CountryIndex = Array.IndexOf(CsvDataHeaders, "Country Name");
             int PopulationIndex = Array.IndexOf(CsvDataHeaders, "Population (Millions) 2012");
             int GDPIndex = Array.IndexOf(CsvDataHeaders, "GDP Billions (USD) 2012");
-
-            // Removing headers from CsvDataList
             CsvDataList.Remove(CsvDataList[0]);
-
-            // Splitting each list entry by comma and storing in a list of string arrays
             List<string[]> CsvDataListSplitByComma = new List<string[]>();
+            AddOrUpdateOutput output = new AddOrUpdateOutput();
             foreach (string item in CsvDataList)
             {
                 CsvDataListSplitByComma.Add(item.Replace("\"", string.Empty).Split(','));
             }
 
-            // Awaiting contents of second file to be read to proceed. Returns string that contains JSON
-            // Preceding steps independent of second file
             string MapData = await MapDataString;
+            var CountryContinetMap = JSONOperations.JSONDeserialize(MapData);
 
-            // Converting string to a JObject
-            var CountryContinetMap = JObject.Parse(MapData);
+            foreach (string[] row in CsvDataListSplitByComma)
+            {
+                float Population = float.Parse(row[PopulationIndex]);
+                float GDP = float.Parse(row[GDPIndex]);
+                try
+                {
+                    string Continent = CountryContinetMap.GetValue(row[CountryIndex]).ToString();
+                    output.AddOrUpdate(Continent, Population, GDP);
+                }
+                catch (Exception) { }
+                
+            }
 
-            // Creating Dictionary with key string(continent) and value(object with GDP2012 and Population2012)
-            Dictionary<string, object> AggregateOutput = AddAggregate(CountryContinetMap, CsvDataListSplitByComma, CountryIndex, PopulationIndex, GDPIndex);
-
-            string Output = JsonConvert.SerializeObject(AggregateOutput, Formatting.Indented);
-            Console.WriteLine(Output);
-            await WriteToFileAsync("../../../../AggregateGDPPopulation/output/output.json", Output);
+            string Output = JSONOperations.JSONSerialize(output.AggregateOutput);
+            await IOOperations.WriteToFileAsync("../../../../AggregateGDPPopulation/output/output.json", Output);
         }
+    }
 
-        public static async Task<List<string>> ReadCSVFileAsync(string filepath)
+    public class AddOrUpdateOutput
+    {
+        public Dictionary<string, GDPandPop> AggregateOutput;
+        public AddOrUpdateOutput()
+        {
+            AggregateOutput = new Dictionary<string, GDPandPop>();
+        }
+        public void AddOrUpdate(string Continent, float Population, float GDP)
+        {
+            try
+            {
+                AggregateOutput[Continent].Population_2012 += Population;
+                AggregateOutput[Continent].Gdp_2012 += GDP;
+            }
+            catch (Exception)
+            {
+                AggregateOutput.Add(Continent, new GDPandPop() { Population_2012 = Population ,Gdp_2012 = GDP });
+            }
+        }
+    }
+
+    public class GDPandPop
+    {
+        private float population_2012;
+        private float gdp_2012;
+        public float Population_2012
+        {
+            get
+            {
+                return this.population_2012;
+            }
+            set
+            {
+                this.population_2012 = value;
+            }
+        }
+        public float Gdp_2012
+        {
+            get
+            {
+                return this.gdp_2012;
+            }
+            set
+            {
+                this.gdp_2012 = value;
+            }
+        }
+    }
+
+    public class IOOperations
+    {
+        // Reads a file line by line Asynchronously. Returns List of strings
+        public static async Task<List<string>> ReadFileByLineAsync(string filepath)
         {
             StreamReader CsvData = new StreamReader(filepath);
             List<string> CsvDataList = new List<string>();
@@ -71,12 +121,14 @@ namespace AggregateGDPPopulation
             return CsvDataList;
         }
 
-        public static async Task<string> ReadMapFileAsync(string filepath)
+        // Reads a file to the end Asynchronously. Returns string
+        public static async Task<string> ReadFileToEndAsync(string filepath)
         {
             StreamReader MapData = new StreamReader(filepath);
             return await MapData.ReadToEndAsync();
         }
 
+        // Writes data to a file Asynchronously
         public static async Task WriteToFileAsync(string filepath, string output)
         {
             using (StreamWriter write = new StreamWriter(filepath))
@@ -84,40 +136,22 @@ namespace AggregateGDPPopulation
                 await write.WriteAsync(output);
             }
         }
-
-        public Dictionary<string, object> AddAggregate(JObject CountryContinentMap, List<string[]> CsvDataListSplitByComma, int CountryIndex, int PopulationIndex, int GDPIndex)
-        {
-            Dictionary<string, GDPPop> AggregateOutput = new Dictionary<string, GDPPop>();
-
-            // Adding data to AggregateOutput
-            CsvDataListSplitByComma.ForEach((row) =>
-            {
-                try
-                {
-                    string Continent = CountryContinetMap.GetValue(row[CountryIndex]).ToString();
-                    AggregateOutput[Continent].Population_2012 += float.Parse(row[PopulationIndex]);
-                    AggregateOutput[Continent].GDP_2012 += float.Parse(row[GDPIndex]);
-                }
-                catch (Exception)
-                {
-                    try
-                    {
-                        string Continent = CountryContinetMap.GetValue(row[CountryIndex]).ToString();
-                        GDPPop GDPandPOP = new GDPPop();
-                        GDPandPOP.Population_2012 = float.Parse(row[PopulationIndex]);
-                        GDPandPOP.GDP_2012 = float.Parse(row[GDPIndex]);
-                        AggregateOutput.Add(Continent, GDPandPOP);
-                    }
-                    catch (Exception) { }
-                }
-            });
-            return AggregateOutput;
-        }
     }
 
-    public class GDPPop
+    public class JSONOperations
     {
-        public float Population_2012 { get; set; }
-        public float GDP_2012 { get; set; }
+        // Converts string to JObject
+        public static JObject JSONDeserialize(string deserializeThis)
+        {
+            JObject deserializedOutput = JObject.Parse(deserializeThis);
+            return deserializedOutput;
+        }
+
+        // Converts Dictionary to string in JSON Format
+        public static string JSONSerialize(Dictionary<string, GDPandPop> serializeThis)
+        {
+            string serializedoutput = JsonConvert.SerializeObject(serializeThis, Formatting.Indented);
+            return serializedoutput;
+        }
     }
 }
